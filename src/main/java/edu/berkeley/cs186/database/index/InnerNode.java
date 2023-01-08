@@ -127,7 +127,6 @@ class InnerNode extends BPlusNode {
 
             // 判断该node中key是否已满
             if (this.keys.size() > this.metadata.getOrder() * 2) {
-                // TODO: 新建节点，返回pair
                 List<DataBox> rightKeys = this.keys.subList(this.metadata.getOrder(), this.keys.size());
                 List<Long> rightChildren = this.children.subList(this.children.size() / 2, this.children.size());
 
