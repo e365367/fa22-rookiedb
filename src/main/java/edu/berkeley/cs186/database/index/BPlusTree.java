@@ -165,7 +165,7 @@ public class BPlusTree {
         if (rid.isPresent()) {
             ArrayList<RecordId> l = new ArrayList<>();
             l.add(rid.get());
-            return l.iterator();
+            return l .iterator();
         } else {
             return Collections.emptyIterator();
         }
@@ -201,8 +201,7 @@ public class BPlusTree {
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
         // TODO(proj2): Return a BPlusTreeIterator.
-
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator();
     }
 
     /**
@@ -235,7 +234,7 @@ public class BPlusTree {
 
         // TODO(proj2): Return a BPlusTreeIterator.
 
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(key);
     }
 
     /**
@@ -257,14 +256,23 @@ public class BPlusTree {
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
-        Optional<Pair<DataBox, Long>> pair = this.root.put(key, rid);
-        // 判断是否需要更新根节点
-        if (!pair.isEmpty()) {
-            Long pageNum = pair.get().getSecond();
-            BPlusNode newRoot = BPlusNode.fromBytes(this.metadata, this.bufferManager, this.lockContext, pageNum);
+        Optional<Pair<DataBox, Long>> res = this.root.put(key, rid);
+        // 判断返回是否为空
+        if (!res.isEmpty()) {
+            // 创建新的root，并替换
+            Long rightPageNum = res.get().getSecond();
+            Long leftPageNum = this.root.getPage().getPageNum();
+            List<Long> children = new ArrayList<>();
+            children.add(leftPageNum);
+            children.add(rightPageNum);
+
+            DataBox rootKey = res.get().getFirst();
+            List<DataBox> keys = new ArrayList<>();
+            keys.add(rootKey);
+
+            BPlusNode newRoot = new InnerNode(this.metadata, this.bufferManager, keys, children, lockContext);
             updateRoot(newRoot);
         }
-        return;
     }
 
     /**
@@ -315,8 +323,7 @@ public class BPlusTree {
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
         // TODO(proj2): implement
-
-        return;
+        this.root.remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
@@ -429,19 +436,73 @@ public class BPlusTree {
     // Iterator ////////////////////////////////////////////////////////////////
     private class BPlusTreeIterator implements Iterator<RecordId> {
         // TODO(proj2): Add whatever fields and constructors you want here.
+        private LeafNode leafNode;
+
+        private DataBox greaterOrEqual;
+
+        private int index;
+        public BPlusTreeIterator() {
+            this.leafNode = root.getLeftmostLeaf();
+            this.index = 0;
+        }
+
+        public BPlusTreeIterator(DataBox key) {
+            this.leafNode = root.getLeftmostLeaf();
+            this.index = 0;
+            this.greaterOrEqual = key;
+        }
 
         @Override
         public boolean hasNext() {
             // TODO(proj2): implement
 
-            return false;
+            // 判断是否符合大于等于的要求
+            for (;;) {
+                // 判断是否遍历完该叶子节点
+                if (index == leafNode.getKeys().size()) {
+                    // 判断当前前节点是否存在右节点
+                    if (leafNode.getRightSibling().isPresent()) {
+                        leafNode = leafNode.getRightSibling().get();
+                        index = 0;
+                        continue;
+                    } else {
+                        return false;
+                    }
+                }
+                // 判断当前指向元素是否符合大于等于的条件
+                if (greaterOrEqual != null && leafNode.getKeys().get(index).compareTo(greaterOrEqual) < 0) {
+                    index++;
+                } else {
+                    break;
+                }
+            }
+            return true;
         }
 
         @Override
         public RecordId next() {
             // TODO(proj2): implement
-
-            throw new NoSuchElementException();
+            // 判断是否符合大于等于的要求
+            for (;;) {
+                // 判断是否遍历完该叶子节点
+                if (index == leafNode.getKeys().size()) {
+                    // 判断当前前节点是否存在右节点
+                    if (leafNode.getRightSibling().isPresent()) {
+                        leafNode = leafNode.getRightSibling().get();
+                        index = 0;
+                        continue;
+                    } else {
+                        throw new NoSuchElementException();
+                    }
+                }
+                // 判断当前指向元素是否符合大于等于的条件
+                if (greaterOrEqual != null && leafNode.getKeys().get(index).compareTo(greaterOrEqual) < 0) {
+                    index++;
+                } else {
+                    break;
+                }
+            }
+            return leafNode.getRids().get(index++);
         }
     }
 }

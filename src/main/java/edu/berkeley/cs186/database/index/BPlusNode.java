@@ -9,6 +9,7 @@ import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -270,5 +271,16 @@ abstract class BPlusNode {
         } finally {
             p.unpin();
         }
+    }
+    public int getFirstGreaterOrEqual(DataBox key, List<DataBox> keys) {
+        int i = 0;
+        for (; i < keys.size() && keys.get(i).compareTo(key) < 0; i++) {}
+        return i;
+    }
+
+    public int getFirstGreater(DataBox key, List<DataBox> keys) {
+        int i = 0;
+        for (; i < keys.size() && keys.get(i).compareTo(key) <= 0; i++) {}
+        return i;
     }
 }

@@ -164,20 +164,38 @@ class LeafNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
+        Optional<Pair<DataBox, Long>> res = Optional.empty();
         int index = this.keys.indexOf(key);
         // 判断该key是否已存在
         if (index != -1) {
             throw new BPlusTreeException("key:" + key + "已存在");
         }
-        // 寻找该key插入位置,即寻找keys中第一个大于key的元素的下标
-        int i = 0;
-        for (; i < this.keys.size() && this.keys.get(i).compareTo(key) < 0; i++) {}
+        int i = getFirstGreater(key, this.keys);
 
         // 加入key和rid
         this.keys.add(i, key);
         this.rids.add(i, rid);
 
-        // 判断是否
+        // 判断是否overflow
+        if (this.keys.size() > this.metadata.getOrder() * 2) {
+            List<DataBox> rightKeys = this.keys.subList(this.metadata.getOrder(), this.metadata.getOrder() * 2 + 1);
+            List<RecordId> rightRids = this.rids.subList(this.metadata.getOrder(), this.metadata.getOrder() * 2 + 1);
+
+            // 创建rightNode
+            LeafNode rightNode = new LeafNode(this.metadata, this.bufferManager, rightKeys,
+                    rightRids, this.rightSibling, this.treeContext);
+
+            // 更新当前node
+            this.keys = this.keys.subList(0, this.metadata.getOrder());
+            this.rids = this.rids.subList(0, this.metadata.getOrder());
+            this.rightSibling = Optional.of(rightNode.page.getPageNum());
+
+            assert (rightKeys.size() == keys.size() + 1);
+            sync();
+
+            return Optional.of(new Pair<>(rightNode.keys.get(0), rightNode.page.getPageNum()));
+        }
+
         sync();
         return Optional.empty();
     }
@@ -195,8 +213,12 @@ class LeafNode extends BPlusNode {
     @Override
     public void remove(DataBox key) {
         // TODO(proj2): implement
-
-        return;
+        int i = this.keys.indexOf(key);
+        if (i != -1) {
+            this.keys.remove(i);
+            this.rids.remove(i);
+            sync();
+        }
     }
 
     // Iterators ///////////////////////////////////////////////////////////////
@@ -407,7 +429,8 @@ class LeafNode extends BPlusNode {
             keys.add(DataBox.fromBytes(buffer, metadata.getKeySchema()));
             rids.add(RecordId.fromBytes(buffer));
         }
-        return new LeafNode(metadata, bufferManager, page, keys, rids, Optional.of(rightSibling), treeContext);
+        return new LeafNode(metadata, bufferManager, page, keys, rids,
+                Optional.ofNullable(rightSibling == -1 ? null : rightSibling) , treeContext);
     }
 
     // Builtins ////////////////////////////////////////////////////////////////

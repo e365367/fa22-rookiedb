@@ -81,15 +81,16 @@ class InnerNode extends BPlusNode {
     @Override
     public LeafNode get(DataBox key) {
         // TODO(proj2): implement
-        // 遍历keys寻找符合条件的key的位置，即寻找列表中第一个大于key的元素,从而获得pageNum
-        int i = 0;
-        for (; i < this.keys.size() && this.keys.get(i).compareTo(key) <= 0; i++) {}
+        int i = getFirstGreater(key, this.keys);
         Long pageNum = this.children.get(i);
 
         // 根据pageNum获取子节点
         BPlusNode node = BPlusNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, pageNum);
         return node.get(key);
     }
+
+    // 遍历keys寻找符合条件的key的位置，即寻找列表中第一个大于key的元素,从而获得pageNum
+
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
@@ -105,33 +106,52 @@ class InnerNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
-        // 遍历keys寻找符合条件的key的位置，即寻找列表中第一个大于key的元素,从而获得pageNum
-        int i = 0;
-        for (; i < this.keys.size() && this.keys.get(i).compareTo(key) <= 0; i++) {}
+        int i = getFirstGreater(key, this.keys);
         Long pageNum = this.children.get(i);
 
         // 根据pageNum获取子节点
         BPlusNode node = BPlusNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, pageNum);
 
-        Optional<Pair<DataBox, Long>> pair = node.put(key, rid);
+        Optional<Pair<DataBox, Long>> res = node.put(key, rid);
         // 判断是否出现节点分裂
-        if (!pair.isEmpty()) {
-            i = 0;
-            DataBox addKey = pair.get().getFirst();
-            Long addPageNum = pair.get().getSecond();
-            for (; i < this.keys.size() && this.keys.get(i).compareTo(addKey) <= 0; i++) {}
-            // 判断该node中key是否已满
-            if (this.keys.size() == this.metadata.getOrder() * 2) {
-                // TODO: 新建节点，返回pair
-            } else {
-                // 加入addKey与addPageNum
-                this.keys.add(i, addKey);
-                this.children.add(i + 1, addPageNum);
-            }
+        if (res.isPresent()) {
+            DataBox addKey = res.get().getFirst();
+            Long addPageNum = res.get().getSecond();
 
+            i = getFirstGreater(key, this.keys);
+
+
+            // 加入addKey与addPageNum
+            this.keys.add(i, addKey);
+            this.children.add(i + 1, addPageNum);
+
+            // 判断该node中key是否已满
+            if (this.keys.size() > this.metadata.getOrder() * 2) {
+                // TODO: 新建节点，返回pair
+                List<DataBox> rightKeys = this.keys.subList(this.metadata.getOrder(), this.keys.size());
+                List<Long> rightChildren = this.children.subList(this.children.size() / 2, this.children.size());
+
+                // 取出右节点的第一个key，返回给父节点
+                DataBox firstKey = rightKeys.remove(0);
+
+                assert (rightChildren.size() == rightKeys.size() + 1);
+
+                // 创建rightNode
+                InnerNode rightNode = new InnerNode(this.metadata, this.bufferManager, rightKeys,
+                        rightChildren, this.treeContext);
+
+                // 更新当前节点
+                this.keys = this.keys.subList(0, this.metadata.getOrder());
+                this.children = this.children.subList(0, this.children.size() / 2);
+
+                assert (children.size() == keys.size() + 1);
+
+                sync();
+                return Optional.of(new Pair<>(firstKey, rightNode.page.getPageNum()));
+            }
             sync();
         }
-        return pair;
+        return Optional.empty();
     }
 
     // See BPlusNode.bulkLoad.
@@ -147,8 +167,9 @@ class InnerNode extends BPlusNode {
     @Override
     public void remove(DataBox key) {
         // TODO(proj2): implement
-
-        return;
+        int i = getFirstGreater(key, this.keys);
+        BPlusNode node = BPlusNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, this.children.get(i));
+        node.remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
