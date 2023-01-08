@@ -146,8 +146,7 @@ public class BPlusTree {
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
         // TODO(proj2): implement
-
-        return Optional.empty();
+        return this.root.get(key).getKey(key);
     }
 
     /**
@@ -258,6 +257,13 @@ public class BPlusTree {
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
+        Optional<Pair<DataBox, Long>> pair = this.root.put(key, rid);
+        // 判断是否需要更新根节点
+        if (!pair.isEmpty()) {
+            Long pageNum = pair.get().getSecond();
+            BPlusNode newRoot = BPlusNode.fromBytes(this.metadata, this.bufferManager, this.lockContext, pageNum);
+            updateRoot(newRoot);
+        }
         return;
     }
 

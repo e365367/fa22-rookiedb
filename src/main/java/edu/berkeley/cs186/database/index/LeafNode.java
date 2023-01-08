@@ -147,8 +147,8 @@ class LeafNode extends BPlusNode {
     @Override
     public LeafNode get(DataBox key) {
         // TODO(proj2): implement
-
-        return null;
+        LeafNode node = this;
+        return node;
     }
 
     // See BPlusNode.getLeftmostLeaf.
@@ -156,14 +156,29 @@ class LeafNode extends BPlusNode {
     public LeafNode getLeftmostLeaf() {
         // TODO(proj2): implement
 
-        return null;
+        // 叶子节点返回自身
+        return this;
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
+        int index = this.keys.indexOf(key);
+        // 判断该key是否已存在
+        if (index != -1) {
+            throw new BPlusTreeException("key:" + key + "已存在");
+        }
+        // 寻找该key插入位置,即寻找keys中第一个大于key的元素的下标
+        int i = 0;
+        for (; i < this.keys.size() && this.keys.get(i).compareTo(key) < 0; i++) {}
 
+        // 加入key和rid
+        this.keys.add(i, key);
+        this.rids.add(i, rid);
+
+        // 判断是否
+        sync();
         return Optional.empty();
     }
 

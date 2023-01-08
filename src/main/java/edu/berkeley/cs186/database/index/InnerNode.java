@@ -81,8 +81,14 @@ class InnerNode extends BPlusNode {
     @Override
     public LeafNode get(DataBox key) {
         // TODO(proj2): implement
+        // 遍历keys寻找符合条件的key的位置，即寻找列表中第一个大于key的元素,从而获得pageNum
+        int i = 0;
+        for (; i < this.keys.size() && this.keys.get(i).compareTo(key) <= 0; i++) {}
+        Long pageNum = this.children.get(i);
 
-        return null;
+        // 根据pageNum获取子节点
+        BPlusNode node = BPlusNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, pageNum);
+        return node.get(key);
     }
 
     // See BPlusNode.getLeftmostLeaf.
@@ -91,15 +97,41 @@ class InnerNode extends BPlusNode {
         assert(children.size() > 0);
         // TODO(proj2): implement
 
-        return null;
+        // 递归调用，由于children升序排列，因此选取下标为0的pageNum
+        return BPlusNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, this.children.get(0)).getLeftmostLeaf();
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
+        // 遍历keys寻找符合条件的key的位置，即寻找列表中第一个大于key的元素,从而获得pageNum
+        int i = 0;
+        for (; i < this.keys.size() && this.keys.get(i).compareTo(key) <= 0; i++) {}
+        Long pageNum = this.children.get(i);
 
-        return Optional.empty();
+        // 根据pageNum获取子节点
+        BPlusNode node = BPlusNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, pageNum);
+
+        Optional<Pair<DataBox, Long>> pair = node.put(key, rid);
+        // 判断是否出现节点分裂
+        if (!pair.isEmpty()) {
+            i = 0;
+            DataBox addKey = pair.get().getFirst();
+            Long addPageNum = pair.get().getSecond();
+            for (; i < this.keys.size() && this.keys.get(i).compareTo(addKey) <= 0; i++) {}
+            // 判断该node中key是否已满
+            if (this.keys.size() == this.metadata.getOrder() * 2) {
+                // TODO: 新建节点，返回pair
+            } else {
+                // 加入addKey与addPageNum
+                this.keys.add(i, addKey);
+                this.children.add(i + 1, addPageNum);
+            }
+
+            sync();
+        }
+        return pair;
     }
 
     // See BPlusNode.bulkLoad.
