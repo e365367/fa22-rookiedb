@@ -258,7 +258,7 @@ public class BPlusTree {
 
         Optional<Pair<DataBox, Long>> res = this.root.put(key, rid);
         // 判断返回是否为空
-        if (!res.isEmpty()) {
+        if (res.isPresent()) {
             // 创建新的root，并替换
             Long rightPageNum = res.get().getSecond();
             Long leftPageNum = this.root.getPage().getPageNum();
@@ -303,7 +303,26 @@ public class BPlusTree {
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
-        return;
+        Optional<Pair<DataBox, Long>> res = this.root.bulkLoad(data, fillFactor);
+        // 判断返回是否为空
+        if (res.isPresent()) {
+            // 创建新的root，并替换
+            Long rightPageNum = res.get().getSecond();
+            Long leftPageNum = this.root.getPage().getPageNum();
+            List<Long> children = new ArrayList<>();
+            children.add(leftPageNum);
+            children.add(rightPageNum);
+
+            DataBox rootKey = res.get().getFirst();
+            List<DataBox> keys = new ArrayList<>();
+            keys.add(rootKey);
+
+            BPlusNode newRoot = new InnerNode(this.metadata, this.bufferManager, keys, children, lockContext);
+            updateRoot(newRoot);
+
+            // 处理未迭代完成的data
+            this.bulkLoad(data, fillFactor);
+        }
     }
 
     /**

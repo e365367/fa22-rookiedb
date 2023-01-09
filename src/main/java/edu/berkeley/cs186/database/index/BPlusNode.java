@@ -272,11 +272,6 @@ abstract class BPlusNode {
             p.unpin();
         }
     }
-    public int getFirstGreaterOrEqual(DataBox key, List<DataBox> keys) {
-        int i = 0;
-        for (; i < keys.size() && keys.get(i).compareTo(key) < 0; i++) {}
-        return i;
-    }
 
     public int getFirstGreater(DataBox key, List<DataBox> keys) {
         int i = 0;

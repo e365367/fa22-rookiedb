@@ -26,6 +26,7 @@ import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 
+import java.io.File;
 import java.util.*;
 import java.util.function.Supplier;
 

@@ -164,15 +164,13 @@ class LeafNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
-        Optional<Pair<DataBox, Long>> res = Optional.empty();
         int index = this.keys.indexOf(key);
         // 判断该key是否已存在
         if (index != -1) {
             throw new BPlusTreeException("key:" + key + "已存在");
         }
-        int i = getFirstGreater(key, this.keys);
-
         // 加入key和rid
+        int i = getFirstGreater(key, this.keys);
         this.keys.add(i, key);
         this.rids.add(i, rid);
 
@@ -206,6 +204,43 @@ class LeafNode extends BPlusNode {
             float fillFactor) {
         // TODO(proj2): implement
 
+        while (data.hasNext()) {
+            Pair<DataBox, RecordId> pair = data.next();
+            DataBox key = pair.getFirst();
+            RecordId rid = pair.getSecond();
+
+            // 判断该key是否已存在
+            if (keys.contains(key)) {
+                throw new BPlusTreeException("key:" + key + "已存在");
+            }
+
+            // 加入key和rid
+            int i = getFirstGreater(key, this.keys);
+            this.keys.add(i, key);
+            this.rids.add(i, rid);
+
+            // 根据fillFactor判断是否overflow
+            if (this.keys.size() > Math.ceil(2 * metadata.getOrder() * fillFactor)) {
+
+
+                // 创建rightNode
+                List<DataBox> rightKeys = new ArrayList<>();
+                List<RecordId> rightRids = new ArrayList<>();
+                rightKeys.add(keys.remove(keys.size() - 1));
+                rightRids.add(rids.remove(rids.size() - 1));
+                LeafNode rightNode = new LeafNode(this.metadata, this.bufferManager, rightKeys,
+                        rightRids, this.rightSibling, this.treeContext);
+
+
+                // 更新当前node
+                this.rightSibling = Optional.of(rightNode.page.getPageNum());
+
+                sync();
+                return Optional.of(new Pair<>(rightNode.keys.get(0), rightNode.page.getPageNum()));
+            }
+        }
+
+        sync();
         return Optional.empty();
     }
 

@@ -159,6 +159,49 @@ class InnerNode extends BPlusNode {
             float fillFactor) {
         // TODO(proj2): implement
 
+        while (data.hasNext()) {
+            // 选取最右边的page
+            Long pageNum = this.children.get(this.children.size() - 1);
+
+            BPlusNode node = BPlusNode.fromBytes(metadata, bufferManager, treeContext, pageNum);
+
+            Optional<Pair<DataBox, Long>> optional = node.bulkLoad(data, fillFactor);
+
+            // 判断op是否存在
+            if (optional.isPresent()) {
+                // 新增key与children
+                DataBox addKey = optional.get().getFirst();
+                Long addPageNum = optional.get().getSecond();
+                keys.add(addKey);
+                children.add(addPageNum);
+
+                // 判断该节点是否溢出需要分裂
+                if (keys.size() > 2 * metadata.getOrder()) {
+                    List<DataBox> rightKeys = this.keys.subList(this.metadata.getOrder(), this.keys.size());
+                    List<Long> rightChildren = this.children.subList(this.children.size() / 2, this.children.size());
+
+                    // 取出右节点的第一个key，返回给父节点
+                    DataBox firstKey = rightKeys.remove(0);
+
+                    assert (rightChildren.size() == rightKeys.size() + 1);
+
+                    // 创建rightNode
+                    InnerNode rightNode = new InnerNode(this.metadata, this.bufferManager, rightKeys,
+                            rightChildren, this.treeContext);
+
+                    // 更新当前节点
+                    this.keys = this.keys.subList(0, this.metadata.getOrder());
+                    this.children = this.children.subList(0, this.children.size() / 2);
+
+                    assert (children.size() == keys.size() + 1);
+
+                    sync();
+                    return Optional.of(new Pair<>(firstKey, rightNode.page.getPageNum()));
+                }
+
+                sync();
+            }
+        }
         return Optional.empty();
     }
 
